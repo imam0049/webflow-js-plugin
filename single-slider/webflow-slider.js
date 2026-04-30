@@ -8,6 +8,7 @@
   var SELECTORS = {
     root: '[data-slider="our-work"]',
     track: "[data-slider-track]",
+    rail: "[data-slider-rail]",
     item: "[data-slider-item]",
     prev: "[data-slider-prev]",
     next: "[data-slider-next]",
@@ -48,6 +49,7 @@
   function Slider(root) {
     this.root = root;
     this.track = root.querySelector(SELECTORS.track);
+    this.rail = this.track ? this.track.querySelector(SELECTORS.rail) : null;
     this.slides = this.track ? Array.prototype.slice.call(this.track.querySelectorAll(SELECTORS.item)) : [];
     this.prevButton = root.querySelector(SELECTORS.prev);
     this.nextButton = root.querySelector(SELECTORS.next);
@@ -77,6 +79,7 @@
 
     this.root.WebflowSliderInstance = this;
     this.root.setAttribute("tabindex", this.root.getAttribute("tabindex") || "0");
+    this.setupRail();
     this.setupLayout();
     this.createDots();
     this.bindEvents();
@@ -84,11 +87,31 @@
     this.startAutoplay();
   };
 
+  Slider.prototype.setupRail = function () {
+    if (this.rail) {
+      this.slides = Array.prototype.slice.call(this.rail.querySelectorAll(SELECTORS.item));
+      return;
+    }
+
+    this.rail = document.createElement("div");
+    this.rail.setAttribute("data-slider-rail", "");
+
+    // The track is the clipped viewport. The generated rail is the moving strip.
+    this.slides.forEach(function (slide) {
+      this.rail.appendChild(slide);
+    }, this);
+
+    this.track.appendChild(this.rail);
+  };
+
   Slider.prototype.setupLayout = function () {
-    this.track.style.display = "flex";
-    this.track.style.willChange = "transform";
-    this.track.style.transition = "transform 500ms ease";
+    this.track.style.overflow = "hidden";
     this.track.style.touchAction = "pan-y";
+
+    this.rail.style.display = "flex";
+    this.rail.style.width = "100%";
+    this.rail.style.willChange = "transform";
+    this.rail.style.transition = "transform 500ms ease";
 
     this.slides.forEach(function (slide) {
       slide.style.flex = "0 0 100%";
@@ -228,7 +251,7 @@
     var offset = this.currentIndex * -100;
 
     // Only write transform and classes here to avoid repeated layout reads.
-    this.track.style.transform = "translateX(" + offset + "%)";
+    this.rail.style.transform = "translateX(" + offset + "%)";
 
     this.slides.forEach(function (slide, index) {
       slide.classList.toggle("is-active", index === this.currentIndex);

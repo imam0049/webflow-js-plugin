@@ -29,14 +29,14 @@ Add `webflow-slider.js` before the closing `</body>` tag.
 
 Use one of these options:
 
-- Upload the file to your CDN and include it with a `<script>` tag.
+- Use the jsDelivr CDN link below.
 - Paste the file contents into Webflow Project Settings custom code before `</body>`.
 - Paste the file contents into Page Settings custom code before `</body>` for page-specific usage.
 
 CDN example:
 
 ```html
-<script src="https://your-cdn.com/webflow-slider.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/imam0049/webflow-js-plugin@1.0.0/single-slider/webflow-slider.js"></script>
 ```
 
 Custom code example:
@@ -51,7 +51,7 @@ Custom code example:
 
 Your current Webflow structure can be used. Add data attributes to the existing elements.
 
-Important: the element with `data-slider-track` should contain only slide items. Keep the control bar outside the track so it does not move with the slides.
+Important: the element with `data-slider-track` is the visible viewport. The plugin automatically applies `overflow: hidden` to it and creates an internal moving rail, so only one slide appears at a time. Keep the control bar outside the track so it does not move with the slides.
 
 ```html
 <div class="our-work-slider" data-slider="our-work" data-autoplay="true" data-delay="5000">
@@ -111,7 +111,7 @@ Add this to the main slider wrapper.
 ```
 
 `data-slider-track`  
-Add this to the element that wraps all slide items. This is the only element the plugin moves.
+Add this to the element that wraps all slide items. This element becomes the overflow-hidden viewport.
 
 ```html
 <div data-slider-track></div>
@@ -147,6 +147,9 @@ Add this to the dots wrapper. The plugin creates the dots inside this element.
 
 `data-slider-dot`  
 The plugin adds this automatically to generated dot elements. You do not need to add it manually.
+
+`data-slider-rail`  
+The plugin creates this automatically inside `[data-slider-track]`. This generated rail is the element that moves with `translateX()`.
 
 ## 5. Class Naming Guide
 
@@ -271,14 +274,15 @@ No new CSS is required by this plugin if your Webflow layout is already styled.
 
 The plugin writes only the minimum inline styles needed for slider behavior:
 
-- `display: flex` on `[data-slider-track]`
-- `transform: translateX(...)` on `[data-slider-track]`
-- `transition` on `[data-slider-track]`
+- `overflow: hidden` on `[data-slider-track]`
+- `touch-action: pan-y` on `[data-slider-track]`
+- `display: flex` on the generated `[data-slider-rail]`
+- `transform: translateX(...)` on the generated `[data-slider-rail]`
+- `transition` on the generated `[data-slider-rail]`
 - `flex: 0 0 100%` on each `[data-slider-item]`
 - `max-width: 100%` on each `[data-slider-item]`
-- `touch-action: pan-y` on `[data-slider-track]`
 
-Keep `overflow: hidden` on the visible slider area in Webflow so only one slide is visible.
+Because `[data-slider-track]` is clipped by the plugin, only one full-width slide is visible at a time.
 
 ## 10. Initialization
 
@@ -348,11 +352,12 @@ The plugin scopes all queries inside each slider wrapper, so sliders do not conf
 
 ## 14. GSAP Compatibility Notes
 
-The plugin only controls `transform` on `[data-slider-track]`.
+The plugin only controls `transform` on the generated `[data-slider-rail]`.
 
 Best practices:
 
-- Do not animate `[data-slider-track]` with GSAP `x`, `xPercent`, or `transform`.
+- Do not animate the generated `[data-slider-rail]` with GSAP `x`, `xPercent`, or `transform`.
+- You can use `[data-slider-track]` as the stable overflow-hidden viewport.
 - Animate children inside `[data-slider-item]` instead.
 - Keep Webflow Interactions on slide content, image, card, or text elements.
 - Avoid changing slide widths while the slider is moving.
@@ -376,7 +381,7 @@ For responsive behavior:
 
 - Keep each slide at full width.
 - Keep controls outside `[data-slider-track]`.
-- Keep the visible slider area clipped with `overflow: hidden`.
+- `[data-slider-track]` is automatically clipped with `overflow: hidden`.
 - Use Webflow breakpoints for image/card stacking and spacing.
 
 ## 17. Troubleshooting
@@ -387,7 +392,7 @@ Slider not moving:
 - Confirm the track has `data-slider-track`.
 - Confirm each slide has `data-slider-item`.
 - Confirm the controls are outside `[data-slider-track]`.
-- Confirm the slider area has `overflow: hidden`.
+- Confirm your slides are inside `[data-slider-track]`; the plugin applies `overflow: hidden` to the track.
 
 Dots not working:
 
