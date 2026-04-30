@@ -28,39 +28,46 @@
   }
 
   function toNumber(value, fallback) {
-    var parsed = parseInt(value, 10);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+    var number = parseInt(value, 10);
+    return Number.isFinite(number) && number >= 0 ? number : fallback;
   }
 
-  function getOptions(root) {
-    return {
-      defaultIndex: toNumber(root.getAttribute("data-accordion-default"), DEFAULTS.defaultIndex),
-      alwaysOpen: toBoolean(root.getAttribute("data-accordion-always-open"), DEFAULTS.alwaysOpen),
-      single: toBoolean(root.getAttribute("data-accordion-single"), DEFAULTS.single),
-      duration: DEFAULTS.duration
-    };
+  function getScrollTop() {
+    return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+  }
+
+  function getScrollLeft() {
+    return window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0;
   }
 
   function Accordion(root) {
     this.root = root;
     this.items = Array.prototype.slice.call(root.querySelectorAll(SELECTORS.item));
-    this.options = getOptions(root);
+    this.options = {
+      defaultIndex: toNumber(root.getAttribute("data-accordion-default"), DEFAULTS.defaultIndex),
+      alwaysOpen: toBoolean(root.getAttribute("data-accordion-always-open"), DEFAULTS.alwaysOpen),
+      single: toBoolean(root.getAttribute("data-accordion-single"), DEFAULTS.single),
+      duration: DEFAULTS.duration
+    };
+
+    this.isAnimating = false;
+    this.scrollLockFrame = null;
 
     this.onClick = this.onClick.bind(this);
     this.onKeyDown = this.onKeyDown.bind(this);
+    this.onPointerDown = this.onPointerDown.bind(this);
     this.onResize = this.onResize.bind(this);
   }
 
   Accordion.prototype.init = function () {
-    if (!this.root || this.items.length === 0 || this.root.WebflowAccordionInstance) {
-      return;
-    }
+    if (!this.root || this.items.length === 0 || this.root.WebflowAccordionInstance) return;
 
     this.root.WebflowAccordionInstance = this;
     this.root.style.overflowAnchor = "none";
+
     this.setupItems();
     this.bindEvents();
-    this.openDefaultItem();
+    this.setDefaultOpenItem();
   };
 
   Accordion.prototype.setupItems = function () {
@@ -70,38 +77,51 @@
 
       if (!trigger || !content) return;
 
-      if (!trigger.hasAttribute("role") && trigger.tagName.toLowerCase() !== "button") {
-        trigger.setAttribute("role", "button");
+      if (trigger.tagName.toLowerCase() !== "button") {
+        if (!trigger.hasAttribute("role")) trigger.setAttribute("role", "button");
+        if (!trigger.hasAttribute("tabindex")) trigger.setAttribute("tabindex", "0");
       }
 
-      if (!trigger.hasAttribute("tabindex") && trigger.tagName.toLowerCase() !== "button") {
-        trigger.setAttribute("tabindex", "0");
-      }
-
-      trigger.setAttribute("aria-expanded", "false");
       trigger.setAttribute("data-accordion-index", String(index));
+      trigger.setAttribute("aria-expanded", "false");
+
       content.setAttribute("aria-hidden", "true");
+      content.style.boxSizing = "border-box";
       content.style.overflow = "hidden";
       content.style.overflowAnchor = "none";
       content.style.height = "0px";
-      content.style.transition = "height " + this.options.duration + "ms ease";
+      content.style.transitionProperty = "height";
+      content.style.transitionDuration = this.options.duration + "ms";
+      content.style.transitionTimingFunction = "ease";
 
       item.classList.remove("is-open", "is-active");
-      this.updateIcon(item, false);
+      this.setIcon(item, false);
     }, this);
   };
 
   Accordion.prototype.bindEvents = function () {
+    this.root.addEventListener("pointerdown", this.onPointerDown);
     this.root.addEventListener("click", this.onClick);
     this.root.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("resize", this.onResize);
   };
 
-  Accordion.prototype.openDefaultItem = function () {
-    var defaultIndex = Math.min(this.options.defaultIndex, this.items.length - 1);
+  Accordion.prototype.setDefaultOpenItem = function () {
+    var index = Math.min(this.options.defaultIndex, this.items.length - 1);
+    if (index < 0) index = 0;
+    this.openItem(this.items[index], false, false);
+  };
 
-    if (defaultIndex < 0) defaultIndex = 0;
-    this.openItem(this.items[defaultIndex], false);
+  Accordion.prototype.onPointerDown = function (event) {
+    var trigger = event.target.closest(SELECTORS.trigger);
+
+    if (!trigger || !this.root.contains(trigger)) return;
+
+    // Mouse focus can make the browser scroll the page to the trigger.
+    // Keyboard focus and touch behavior remain available.
+    if (event.pointerType === "mouse") {
+      event.preventDefault();
+    }
   };
 
   Accordion.prototype.onClick = function (event) {
@@ -110,7 +130,7 @@
     if (!trigger || !this.root.contains(trigger)) return;
 
     event.preventDefault();
-    this.toggleItemWithoutScrollJump(trigger.closest(SELECTORS.item));
+    this.toggleItem(trigger.closest(SELECTORS.item), true);
   };
 
   Accordion.prototype.onKeyDown = function (event) {
@@ -120,99 +140,115 @@
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      this.toggleItemWithoutScrollJump(trigger.closest(SELECTORS.item));
+      this.toggleItem(trigger.closest(SELECTORS.item), true);
     }
-  };
-
-  Accordion.prototype.toggleItemWithoutScrollJump = function (item) {
-    var scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
-    var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
-
-    this.toggleItem(item);
-
-    // Accordion height changes can trigger browser scroll anchoring. Restore the
-    // user's viewport so clicking an FAQ never scrolls the main page.
-    window.requestAnimationFrame(function () {
-      window.scrollTo(scrollX, scrollY);
-    });
   };
 
   Accordion.prototype.onResize = function () {
     this.items.forEach(function (item) {
       var content = item.querySelector(SELECTORS.content);
-
-      if (item.classList.contains("is-open") && content) {
+      if (content && item.classList.contains("is-open")) {
         content.style.height = "auto";
       }
     });
   };
 
-  Accordion.prototype.toggleItem = function (item) {
-    if (!item) return;
+  Accordion.prototype.toggleItem = function (item, lockScroll) {
+    if (!item || this.isAnimating) return;
+
+    if (lockScroll) this.lockPageScroll(this.options.duration + 80);
 
     if (item.classList.contains("is-open")) {
-      if (this.options.alwaysOpen && this.getOpenItems().length <= 1) {
-        return;
-      }
-
-      this.closeItem(item);
+      if (this.options.alwaysOpen && this.getOpenItems().length <= 1) return;
+      this.closeItem(item, true);
       return;
     }
 
-    this.openItem(item, true);
+    this.openItem(item, this.options.single, true);
   };
 
-  Accordion.prototype.openItem = function (item, closeSiblings) {
+  Accordion.prototype.openItem = function (item, closeSiblings, animate) {
     var content;
     var trigger;
 
     if (!item) return;
-
-    if (this.options.single && closeSiblings) {
-      this.items.forEach(function (otherItem) {
-        if (otherItem !== item) {
-          this.closeItem(otherItem);
-        }
-      }, this);
-    }
 
     content = item.querySelector(SELECTORS.content);
     trigger = item.querySelector(SELECTORS.trigger);
 
     if (!content || !trigger) return;
 
+    this.isAnimating = !!animate;
+
+    if (closeSiblings) {
+      this.items.forEach(function (sibling) {
+        if (sibling !== item) this.closeItem(sibling, animate);
+      }, this);
+    }
+
     item.classList.add("is-open", "is-active");
     trigger.setAttribute("aria-expanded", "true");
     content.setAttribute("aria-hidden", "false");
-    this.updateIcon(item, true);
+    this.setIcon(item, true);
 
-    // Measure once, then animate height. Setting auto after the transition
-    // lets the content respond to text wrapping and breakpoint changes.
+    if (!animate) {
+      content.style.height = "auto";
+      this.isAnimating = false;
+      return;
+    }
+
+    content.style.height = "0px";
+    content.offsetHeight;
     content.style.height = content.scrollHeight + "px";
 
     window.setTimeout(function () {
-      if (item.classList.contains("is-open")) {
-        content.style.height = "auto";
-      }
-    }, this.options.duration);
+      if (item.classList.contains("is-open")) content.style.height = "auto";
+      this.isAnimating = false;
+    }.bind(this), this.options.duration);
   };
 
-  Accordion.prototype.closeItem = function (item) {
+  Accordion.prototype.closeItem = function (item, animate) {
     var content = item ? item.querySelector(SELECTORS.content) : null;
     var trigger = item ? item.querySelector(SELECTORS.trigger) : null;
 
     if (!item || !content || !trigger || !item.classList.contains("is-open")) return;
 
-    content.style.height = content.scrollHeight + "px";
-
-    // Force the browser to register the current height before animating to 0.
-    content.offsetHeight;
-    content.style.height = "0px";
-
     item.classList.remove("is-open", "is-active");
     trigger.setAttribute("aria-expanded", "false");
     content.setAttribute("aria-hidden", "true");
-    this.updateIcon(item, false);
+    this.setIcon(item, false);
+
+    if (!animate) {
+      content.style.height = "0px";
+      return;
+    }
+
+    content.style.height = content.scrollHeight + "px";
+    content.offsetHeight;
+    content.style.height = "0px";
+  };
+
+  Accordion.prototype.lockPageScroll = function (duration) {
+    var start = window.performance && window.performance.now ? window.performance.now() : Date.now();
+    var scrollX = getScrollLeft();
+    var scrollY = getScrollTop();
+    var restore = function () {
+      var now = window.performance && window.performance.now ? window.performance.now() : Date.now();
+
+      window.scrollTo(scrollX, scrollY);
+
+      if (now - start < duration) {
+        this.scrollLockFrame = window.requestAnimationFrame(restore);
+      } else {
+        this.scrollLockFrame = null;
+      }
+    }.bind(this);
+
+    if (this.scrollLockFrame) {
+      window.cancelAnimationFrame(this.scrollLockFrame);
+    }
+
+    restore();
   };
 
   Accordion.prototype.getOpenItems = function () {
@@ -221,20 +257,19 @@
     });
   };
 
-  Accordion.prototype.updateIcon = function (item, isOpen) {
+  Accordion.prototype.setIcon = function (item, isOpen) {
     var icon = item.querySelector(SELECTORS.icon);
 
     if (!icon) return;
 
+    icon.classList.add("ph");
     icon.classList.toggle("ph-plus", !isOpen);
     icon.classList.toggle("ph-minus", isOpen);
-
-    if (!icon.classList.contains("ph")) {
-      icon.classList.add("ph");
-    }
   };
 
   Accordion.prototype.destroy = function () {
+    if (this.scrollLockFrame) window.cancelAnimationFrame(this.scrollLockFrame);
+    this.root.removeEventListener("pointerdown", this.onPointerDown);
     this.root.removeEventListener("click", this.onClick);
     this.root.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("resize", this.onResize);
@@ -253,9 +288,7 @@
       accordion = new Accordion(root);
       accordion.init();
 
-      if (root.WebflowAccordionInstance) {
-        instances.push(accordion);
-      }
+      if (root.WebflowAccordionInstance) instances.push(accordion);
     });
 
     return instances;

@@ -359,6 +359,8 @@ Page scrolls when clicking an item:
 
 - Make sure you are using the latest `webflow-accordion.js`.
 - The plugin disables scroll anchoring on `[data-accordion]` and `[data-accordion-content]`.
+- The plugin also locks the current page scroll position for the full accordion animation duration.
+- Mouse focus on non-button triggers is prevented so the browser does not scroll the trigger into view.
 - Avoid adding custom click interactions that also scroll to the FAQ item.
 
 Icon not changing:
@@ -389,7 +391,7 @@ Performance details:
 - Uses one delegated keydown listener per accordion group
 - Measures `scrollHeight` only when opening or closing
 - Uses native height transitions
-- Preserves the current page scroll position during user-triggered toggles
+- Preserves the current page scroll position for the full user-triggered animation
 - Keeps each accordion instance independent
 - Uses only data attributes for DOM targeting
 - Requires no jQuery or external JavaScript libraries
