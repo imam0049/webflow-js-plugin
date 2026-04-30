@@ -57,6 +57,7 @@
     }
 
     this.root.WebflowAccordionInstance = this;
+    this.root.style.overflowAnchor = "none";
     this.setupItems();
     this.bindEvents();
     this.openDefaultItem();
@@ -81,6 +82,7 @@
       trigger.setAttribute("data-accordion-index", String(index));
       content.setAttribute("aria-hidden", "true");
       content.style.overflow = "hidden";
+      content.style.overflowAnchor = "none";
       content.style.height = "0px";
       content.style.transition = "height " + this.options.duration + "ms ease";
 
@@ -108,7 +110,7 @@
     if (!trigger || !this.root.contains(trigger)) return;
 
     event.preventDefault();
-    this.toggleItem(trigger.closest(SELECTORS.item));
+    this.toggleItemWithoutScrollJump(trigger.closest(SELECTORS.item));
   };
 
   Accordion.prototype.onKeyDown = function (event) {
@@ -118,8 +120,21 @@
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      this.toggleItem(trigger.closest(SELECTORS.item));
+      this.toggleItemWithoutScrollJump(trigger.closest(SELECTORS.item));
     }
+  };
+
+  Accordion.prototype.toggleItemWithoutScrollJump = function (item) {
+    var scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
+    var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+    this.toggleItem(item);
+
+    // Accordion height changes can trigger browser scroll anchoring. Restore the
+    // user's viewport so clicking an FAQ never scrolls the main page.
+    window.requestAnimationFrame(function () {
+      window.scrollTo(scrollX, scrollY);
+    });
   };
 
   Accordion.prototype.onResize = function () {

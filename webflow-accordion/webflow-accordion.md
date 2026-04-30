@@ -17,6 +17,7 @@ Key features:
 - Optional single-item mode
 - Optional always-one-open behavior
 - Smooth height animation with `scrollHeight`
+- Prevents page scroll jumps when items open or close
 - Phosphor icon class toggling
 - Keyboard accessible triggers
 - Webflow Interactions and GSAP friendly
@@ -259,6 +260,7 @@ The plugin writes the core inline styles needed for height animation, but this C
 
 [data-accordion-content] {
   overflow: hidden;
+  overflow-anchor: none;
 }
 
 [data-accordion-item].is-open [data-accordion-content] {
@@ -353,6 +355,12 @@ Accordion not opening:
 - Confirm each content panel has `data-accordion-content`.
 - Check the browser console for JavaScript errors.
 
+Page scrolls when clicking an item:
+
+- Make sure you are using the latest `webflow-accordion.js`.
+- The plugin disables scroll anchoring on `[data-accordion]` and `[data-accordion-content]`.
+- Avoid adding custom click interactions that also scroll to the FAQ item.
+
 Icon not changing:
 
 - Confirm the icon has `data-accordion-icon`.
@@ -381,6 +389,7 @@ Performance details:
 - Uses one delegated keydown listener per accordion group
 - Measures `scrollHeight` only when opening or closing
 - Uses native height transitions
+- Preserves the current page scroll position during user-triggered toggles
 - Keeps each accordion instance independent
 - Uses only data attributes for DOM targeting
 - Requires no jQuery or external JavaScript libraries
