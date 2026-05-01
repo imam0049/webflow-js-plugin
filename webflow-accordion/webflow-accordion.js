@@ -32,14 +32,6 @@
     return Number.isFinite(number) && number >= 0 ? number : fallback;
   }
 
-  function getScrollTop() {
-    return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-  }
-
-  function getScrollLeft() {
-    return window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0;
-  }
-
   function Accordion(root) {
     this.root = root;
     this.items = Array.prototype.slice.call(root.querySelectorAll(SELECTORS.item));
@@ -52,6 +44,7 @@
 
     this.isAnimating = false;
     this.scrollLockFrame = null;
+    this.scrollLockState = null;
 
     this.onClick = this.onClick.bind(this);
     this.onKeyDown = this.onKeyDown.bind(this);
@@ -130,7 +123,7 @@
     if (!trigger || !this.root.contains(trigger)) return;
 
     event.preventDefault();
-    this.toggleItem(trigger.closest(SELECTORS.item), true);
+    this.toggleItem(trigger.closest(SELECTORS.item), trigger);
   };
 
   Accordion.prototype.onKeyDown = function (event) {
@@ -140,7 +133,7 @@
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      this.toggleItem(trigger.closest(SELECTORS.item), true);
+      this.toggleItem(trigger.closest(SELECTORS.item), trigger);
     }
   };
 
@@ -153,10 +146,10 @@
     });
   };
 
-  Accordion.prototype.toggleItem = function (item, lockScroll) {
+  Accordion.prototype.toggleItem = function (item, trigger) {
     if (!item || this.isAnimating) return;
 
-    if (lockScroll) this.lockPageScroll(this.options.duration + 80);
+    if (trigger) this.lockPageScroll(trigger, this.options.duration + 80);
 
     if (item.classList.contains("is-open")) {
       if (this.options.alwaysOpen && this.getOpenItems().length <= 1) return;
@@ -228,19 +221,26 @@
     content.style.height = "0px";
   };
 
-  Accordion.prototype.lockPageScroll = function (duration) {
+  Accordion.prototype.lockPageScroll = function (trigger, duration) {
+    var html = document.documentElement;
     var start = window.performance && window.performance.now ? window.performance.now() : Date.now();
-    var scrollX = getScrollLeft();
-    var scrollY = getScrollTop();
-    var restore = function () {
+    var startTop = trigger.getBoundingClientRect().top;
+    var originalScrollBehavior = html.style.scrollBehavior;
+    var compensate = function () {
       var now = window.performance && window.performance.now ? window.performance.now() : Date.now();
+      var currentTop = trigger.getBoundingClientRect().top;
+      var delta = currentTop - startTop;
 
-      window.scrollTo(scrollX, scrollY);
+      if (Math.abs(delta) > 0.5) {
+        window.scrollBy(0, delta);
+      }
 
       if (now - start < duration) {
-        this.scrollLockFrame = window.requestAnimationFrame(restore);
+        this.scrollLockFrame = window.requestAnimationFrame(compensate);
       } else {
+        html.style.scrollBehavior = originalScrollBehavior;
         this.scrollLockFrame = null;
+        this.scrollLockState = null;
       }
     }.bind(this);
 
@@ -248,7 +248,20 @@
       window.cancelAnimationFrame(this.scrollLockFrame);
     }
 
-    restore();
+    this.scrollLockState = { htmlScrollBehavior: originalScrollBehavior };
+    html.style.scrollBehavior = "auto";
+    compensate();
+  };
+
+  Accordion.prototype.unlockPageScroll = function () {
+    var state = this.scrollLockState;
+
+    if (!state) return;
+
+    document.documentElement.style.scrollBehavior = state.htmlScrollBehavior;
+    if (this.scrollLockFrame) window.cancelAnimationFrame(this.scrollLockFrame);
+    this.scrollLockState = null;
+    this.scrollLockFrame = null;
   };
 
   Accordion.prototype.getOpenItems = function () {
@@ -269,6 +282,7 @@
 
   Accordion.prototype.destroy = function () {
     if (this.scrollLockFrame) window.cancelAnimationFrame(this.scrollLockFrame);
+    this.unlockPageScroll();
     this.root.removeEventListener("pointerdown", this.onPointerDown);
     this.root.removeEventListener("click", this.onClick);
     this.root.removeEventListener("keydown", this.onKeyDown);

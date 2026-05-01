@@ -342,6 +342,8 @@ Best practices:
 - Animate child elements inside `[data-accordion-content]` instead.
 - Use Webflow Interactions on inner text, icons, or decorative elements.
 - Avoid changing content height during an open or close transition.
+- The plugin does not set `body: fixed`, lock page scrolling globally, or pin the page. It only compensates scroll by the amount the clicked trigger shifts while height changes.
+- If using GSAP ScrollTrigger, call `ScrollTrigger.refresh()` after major layout changes if your page has pinned sections below the FAQ.
 
 This prevents GSAP, Webflow Interactions, and the accordion plugin from competing over the same property.
 
@@ -359,7 +361,8 @@ Page scrolls when clicking an item:
 
 - Make sure you are using the latest `webflow-accordion.js`.
 - The plugin disables scroll anchoring on `[data-accordion]` and `[data-accordion-content]`.
-- The plugin also locks the current page scroll position for the full accordion animation duration.
+- The plugin keeps the clicked trigger visually anchored while the accordion changes height.
+- The plugin temporarily disables CSS smooth scrolling during this compensation, then restores it.
 - Mouse focus on non-button triggers is prevented so the browser does not scroll the trigger into view.
 - Avoid adding custom click interactions that also scroll to the FAQ item.
 
@@ -391,7 +394,7 @@ Performance details:
 - Uses one delegated keydown listener per accordion group
 - Measures `scrollHeight` only when opening or closing
 - Uses native height transitions
-- Preserves the current page scroll position for the full user-triggered animation
+- Uses GSAP-friendly scroll compensation instead of locking `body`
 - Keeps each accordion instance independent
 - Uses only data attributes for DOM targeting
 - Requires no jQuery or external JavaScript libraries
