@@ -1,23 +1,22 @@
 /*!
- * WebflowAccordion - FAQ Accordion
- * Lightweight vanilla JavaScript accordion for Webflow.
+ * WebflowLogoSlider - Client Logo Marquee
+ * Lightweight vanilla JavaScript marquee slider for Webflow.
  */
 (function (window, document) {
   "use strict";
 
   var SELECTORS = {
-    root: "[data-accordion]",
-    item: "[data-accordion-item]",
-    trigger: "[data-accordion-trigger]",
-    content: "[data-accordion-content]",
-    icon: "[data-accordion-icon]"
+    root: "[data-logo-slider]",
+    track: "[data-logo-track]",
+    item: "[data-logo-item]"
   };
 
   var DEFAULTS = {
-    defaultIndex: 0,
-    alwaysOpen: true,
-    single: true,
-    duration: 300
+    speed: 1,
+    direction: "left",
+    pauseHover: true,
+    gap: 100,
+    duplicate: true
   };
 
   var instances = [];
@@ -28,216 +27,230 @@
   }
 
   function toNumber(value, fallback) {
-    var number = parseInt(value, 10);
-    return Number.isFinite(number) && number >= 0 ? number : fallback;
+    var parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
-  function Accordion(root) {
-    this.root = root;
-    this.items = Array.prototype.slice.call(root.querySelectorAll(SELECTORS.item));
-    this.options = {
-      defaultIndex: toNumber(root.getAttribute("data-accordion-default"), DEFAULTS.defaultIndex),
-      alwaysOpen: toBoolean(root.getAttribute("data-accordion-always-open"), DEFAULTS.alwaysOpen),
-      single: toBoolean(root.getAttribute("data-accordion-single"), DEFAULTS.single),
-      duration: DEFAULTS.duration
-    };
+  function getOptions(root) {
+    var direction = root.getAttribute("data-logo-direction") || DEFAULTS.direction;
 
-    this.isAnimating = false;
-    this.onClick = this.onClick.bind(this);
-    this.onKeyDown = this.onKeyDown.bind(this);
-    this.onPointerDown = this.onPointerDown.bind(this);
+    return {
+      speed: Math.max(0, toNumber(root.getAttribute("data-logo-speed"), DEFAULTS.speed)),
+      direction: direction === "right" ? "right" : "left",
+      pauseHover: toBoolean(root.getAttribute("data-logo-pause-hover"), DEFAULTS.pauseHover),
+      gap: Math.max(0, toNumber(root.getAttribute("data-logo-gap"), DEFAULTS.gap)),
+      duplicate: toBoolean(root.getAttribute("data-logo-duplicate"), DEFAULTS.duplicate)
+    };
+  }
+
+  function LogoSlider(root) {
+    this.root = root;
+    this.track = root.querySelector(SELECTORS.track);
+    this.options = getOptions(root);
+    this.originalItems = [];
+    this.clones = [];
+    this.position = 0;
+    this.loopWidth = 0;
+    this.rafId = null;
+    this.lastTime = 0;
+    this.isPaused = false;
+    this.resizeTimer = null;
+
+    this.animate = this.animate.bind(this);
+    this.pause = this.pause.bind(this);
+    this.resume = this.resume.bind(this);
     this.onResize = this.onResize.bind(this);
   }
 
-  Accordion.prototype.init = function () {
-    if (!this.root || this.items.length === 0 || this.root.WebflowAccordionInstance) return;
+  LogoSlider.prototype.init = function () {
+    if (!this.root || !this.track || this.root.WebflowLogoSliderInstance) return;
 
-    this.root.WebflowAccordionInstance = this;
-    this.root.style.overflowAnchor = "none";
+    this.root.WebflowLogoSliderInstance = this;
+    this.originalItems = Array.prototype.slice.call(this.track.querySelectorAll(SELECTORS.item))
+      .filter(function (item) {
+        return item.getAttribute("data-logo-clone") !== "true";
+      });
 
-    this.setupItems();
+    if (this.originalItems.length === 0) return;
+
+    this.setupLayout();
+    this.rebuild();
     this.bindEvents();
-    this.setDefaultOpenItem();
+    this.play();
   };
 
-  Accordion.prototype.setupItems = function () {
-    this.items.forEach(function (item, index) {
-      var trigger = item.querySelector(SELECTORS.trigger);
-      var content = item.querySelector(SELECTORS.content);
+  LogoSlider.prototype.setupLayout = function () {
+    this.root.style.overflow = "hidden";
+    this.root.style.width = this.root.style.width || "100%";
 
-      if (!trigger || !content) return;
+    this.track.style.display = "flex";
+    this.track.style.flexWrap = "nowrap";
+    this.track.style.alignItems = "center";
+    this.track.style.gap = "0px";
+    this.track.style.columnGap = "0px";
+    this.track.style.willChange = "transform";
 
-      if (trigger.tagName.toLowerCase() !== "button") {
-        if (!trigger.hasAttribute("role")) trigger.setAttribute("role", "button");
-        if (!trigger.hasAttribute("tabindex")) trigger.setAttribute("tabindex", "0");
-      }
+    this.applyItemSpacing(this.originalItems);
+  };
 
-      trigger.setAttribute("data-accordion-index", String(index));
-      trigger.setAttribute("aria-expanded", "false");
-
-      content.setAttribute("aria-hidden", "true");
-      content.style.boxSizing = "border-box";
-      content.style.overflow = "hidden";
-      content.style.overflowAnchor = "none";
-      content.style.height = "0px";
-      content.style.transitionProperty = "height";
-      content.style.transitionDuration = this.options.duration + "ms";
-      content.style.transitionTimingFunction = "ease";
-
-      item.classList.remove("is-open", "is-active");
-      this.setIcon(item, false);
+  LogoSlider.prototype.applyItemSpacing = function (items) {
+    items.forEach(function (item) {
+      item.style.flex = "0 0 auto";
+      item.style.marginRight = this.options.gap + "px";
     }, this);
   };
 
-  Accordion.prototype.bindEvents = function () {
-    this.root.addEventListener("pointerdown", this.onPointerDown);
-    this.root.addEventListener("click", this.onClick);
-    this.root.addEventListener("keydown", this.onKeyDown);
+  LogoSlider.prototype.bindEvents = function () {
+    if (this.options.pauseHover) {
+      this.root.addEventListener("mouseenter", this.pause);
+      this.root.addEventListener("mouseleave", this.resume);
+      this.root.addEventListener("focusin", this.pause);
+      this.root.addEventListener("focusout", this.resume);
+    }
+
     window.addEventListener("resize", this.onResize);
   };
 
-  Accordion.prototype.setDefaultOpenItem = function () {
-    var index = Math.min(this.options.defaultIndex, this.items.length - 1);
-    if (index < 0) index = 0;
-    this.openItem(this.items[index], false, false);
-  };
+  LogoSlider.prototype.rebuild = function () {
+    this.stop();
+    this.removeClones();
+    this.track.style.transform = "translateX(0px)";
+    this.position = 0;
 
-  Accordion.prototype.onPointerDown = function (event) {
-    var trigger = event.target.closest(SELECTORS.trigger);
-
-    if (!trigger || !this.root.contains(trigger)) return;
-
-    // Mouse focus can make the browser scroll the page to the trigger.
-    // Keyboard focus and touch behavior remain available.
-    if (event.pointerType === "mouse") {
-      event.preventDefault();
-    }
-  };
-
-  Accordion.prototype.onClick = function (event) {
-    var trigger = event.target.closest(SELECTORS.trigger);
-
-    if (!trigger || !this.root.contains(trigger)) return;
-
-    event.preventDefault();
-    this.toggleItem(trigger.closest(SELECTORS.item));
-  };
-
-  Accordion.prototype.onKeyDown = function (event) {
-    var trigger = event.target.closest(SELECTORS.trigger);
-
-    if (!trigger || !this.root.contains(trigger)) return;
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      this.toggleItem(trigger.closest(SELECTORS.item));
-    }
-  };
-
-  Accordion.prototype.onResize = function () {
-    this.items.forEach(function (item) {
-      var content = item.querySelector(SELECTORS.content);
-      if (content && item.classList.contains("is-open")) {
-        content.style.height = "auto";
-      }
-    });
-  };
-
-  Accordion.prototype.toggleItem = function (item) {
-    if (!item || this.isAnimating) return;
-
-    if (item.classList.contains("is-open")) {
-      if (this.options.alwaysOpen && this.getOpenItems().length <= 1) return;
-      this.closeItem(item, true);
-      return;
+    if (this.options.duplicate) {
+      this.createClones();
     }
 
-    this.openItem(item, this.options.single, true);
+    this.loopWidth = this.measureOriginalWidth();
+
+    if (this.options.direction === "right" && this.loopWidth > 0) {
+      this.position = -this.loopWidth;
+      this.track.style.transform = "translateX(" + this.position + "px)";
+    }
+
+    this.play();
   };
 
-  Accordion.prototype.openItem = function (item, closeSiblings, animate) {
-    var content;
-    var trigger;
+  LogoSlider.prototype.createClones = function () {
+    var rootWidth = this.root.getBoundingClientRect().width;
+    var originalWidth = this.measureOriginalWidth();
+    var targetWidth = Math.max(rootWidth * 2, originalWidth * 2);
+    var createdWidth = originalWidth;
 
-    if (!item) return;
-
-    content = item.querySelector(SELECTORS.content);
-    trigger = item.querySelector(SELECTORS.trigger);
-
-    if (!content || !trigger) return;
-
-    this.isAnimating = !!animate;
-
-    if (closeSiblings) {
-      this.items.forEach(function (sibling) {
-        if (sibling !== item) this.closeItem(sibling, animate);
+    // Keep adding full sets until the moving rail is wide enough to loop
+    // without showing empty space on large screens.
+    while (createdWidth < targetWidth && originalWidth > 0) {
+      this.originalItems.forEach(function (item) {
+        var clone = item.cloneNode(true);
+        clone.setAttribute("data-logo-clone", "true");
+        clone.setAttribute("aria-hidden", "true");
+        this.applyItemSpacing([clone]);
+        this.track.appendChild(clone);
+        this.clones.push(clone);
       }, this);
+
+      createdWidth += originalWidth;
     }
-
-    item.classList.add("is-open", "is-active");
-    trigger.setAttribute("aria-expanded", "true");
-    content.setAttribute("aria-hidden", "false");
-    this.setIcon(item, true);
-
-    if (!animate) {
-      content.style.height = "auto";
-      this.isAnimating = false;
-      return;
-    }
-
-    content.style.height = "0px";
-    content.offsetHeight;
-    content.style.height = content.scrollHeight + "px";
-
-    window.setTimeout(function () {
-      if (item.classList.contains("is-open")) content.style.height = "auto";
-      this.isAnimating = false;
-    }.bind(this), this.options.duration);
   };
 
-  Accordion.prototype.closeItem = function (item, animate) {
-    var content = item ? item.querySelector(SELECTORS.content) : null;
-    var trigger = item ? item.querySelector(SELECTORS.trigger) : null;
+  LogoSlider.prototype.measureOriginalWidth = function () {
+    var total = 0;
 
-    if (!item || !content || !trigger || !item.classList.contains("is-open")) return;
+    this.originalItems.forEach(function (item, index) {
+      total += item.getBoundingClientRect().width;
 
-    item.classList.remove("is-open", "is-active");
-    trigger.setAttribute("aria-expanded", "false");
-    content.setAttribute("aria-hidden", "true");
-    this.setIcon(item, false);
+      if (index < this.originalItems.length - 1) {
+        total += this.options.gap;
+      }
+    }, this);
 
-    if (!animate) {
-      content.style.height = "0px";
-      return;
-    }
-
-    content.style.height = content.scrollHeight + "px";
-    content.offsetHeight;
-    content.style.height = "0px";
+    return total + this.options.gap;
   };
 
-  Accordion.prototype.getOpenItems = function () {
-    return this.items.filter(function (item) {
-      return item.classList.contains("is-open");
+  LogoSlider.prototype.removeClones = function () {
+    this.clones.forEach(function (clone) {
+      if (clone.parentNode) clone.parentNode.removeChild(clone);
     });
+
+    this.clones = [];
   };
 
-  Accordion.prototype.setIcon = function (item, isOpen) {
-    var icon = item.querySelector(SELECTORS.icon);
+  LogoSlider.prototype.play = function () {
+    if (this.rafId || this.loopWidth <= 0 || this.options.speed <= 0) return;
 
-    if (!icon) return;
-
-    icon.classList.add("ph");
-    icon.classList.toggle("ph-plus", !isOpen);
-    icon.classList.toggle("ph-minus", isOpen);
+    this.root.classList.add("is-running");
+    this.root.classList.remove("is-paused");
+    this.lastTime = 0;
+    this.rafId = window.requestAnimationFrame(this.animate);
   };
 
-  Accordion.prototype.destroy = function () {
-    this.root.removeEventListener("pointerdown", this.onPointerDown);
-    this.root.removeEventListener("click", this.onClick);
-    this.root.removeEventListener("keydown", this.onKeyDown);
+  LogoSlider.prototype.stop = function () {
+    if (!this.rafId) return;
+
+    window.cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+  };
+
+  LogoSlider.prototype.pause = function () {
+    this.isPaused = true;
+    this.root.classList.add("is-paused");
+    this.root.classList.remove("is-running");
+  };
+
+  LogoSlider.prototype.resume = function () {
+    this.isPaused = false;
+    this.root.classList.add("is-running");
+    this.root.classList.remove("is-paused");
+  };
+
+  LogoSlider.prototype.animate = function (timestamp) {
+    var elapsed;
+    var distance;
+
+    if (!this.lastTime) this.lastTime = timestamp;
+    elapsed = timestamp - this.lastTime;
+    this.lastTime = timestamp;
+
+    if (!this.isPaused && this.loopWidth > 0) {
+      distance = this.options.speed * (elapsed / 16.67);
+
+      if (this.options.direction === "right") {
+        this.position += distance;
+        if (this.position >= 0) this.position -= this.loopWidth;
+      } else {
+        this.position -= distance;
+        if (Math.abs(this.position) >= this.loopWidth) this.position += this.loopWidth;
+      }
+
+      this.track.style.transform = "translateX(" + this.position + "px)";
+    }
+
+    this.rafId = window.requestAnimationFrame(this.animate);
+  };
+
+  LogoSlider.prototype.onResize = function () {
+    if (this.resizeTimer) window.clearTimeout(this.resizeTimer);
+
+    this.resizeTimer = window.setTimeout(function () {
+      this.rebuild();
+    }.bind(this), 150);
+  };
+
+  LogoSlider.prototype.destroy = function () {
+    this.stop();
+    if (this.resizeTimer) window.clearTimeout(this.resizeTimer);
+
+    this.removeClones();
+    this.track.style.transform = "";
+    this.track.style.willChange = "";
+
+    this.root.classList.remove("is-running", "is-paused");
+    this.root.removeEventListener("mouseenter", this.pause);
+    this.root.removeEventListener("mouseleave", this.resume);
+    this.root.removeEventListener("focusin", this.pause);
+    this.root.removeEventListener("focusout", this.resume);
     window.removeEventListener("resize", this.onResize);
-    delete this.root.WebflowAccordionInstance;
+    delete this.root.WebflowLogoSliderInstance;
   };
 
   function init(context) {
@@ -245,14 +258,14 @@
     var roots = Array.prototype.slice.call(scope.querySelectorAll(SELECTORS.root));
 
     roots.forEach(function (root) {
-      var accordion;
+      var slider;
 
-      if (root.WebflowAccordionInstance) return;
+      if (root.WebflowLogoSliderInstance) return;
 
-      accordion = new Accordion(root);
-      accordion.init();
+      slider = new LogoSlider(root);
+      slider.init();
 
-      if (root.WebflowAccordionInstance) instances.push(accordion);
+      if (root.WebflowLogoSliderInstance) instances.push(slider);
     });
 
     return instances;
@@ -265,7 +278,7 @@
     instances = [];
   }
 
-  window.WebflowAccordion = {
+  window.WebflowLogoSlider = {
     init: init,
     destroy: destroy,
     instances: function () {
