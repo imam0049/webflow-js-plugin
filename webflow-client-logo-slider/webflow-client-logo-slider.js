@@ -86,12 +86,18 @@
     this.track.style.display = "flex";
     this.track.style.flexWrap = "nowrap";
     this.track.style.alignItems = "center";
-    this.track.style.gap = this.options.gap + "px";
+    this.track.style.gap = "0px";
+    this.track.style.columnGap = "0px";
     this.track.style.willChange = "transform";
 
-    this.originalItems.forEach(function (item) {
+    this.applyItemSpacing(this.originalItems);
+  };
+
+  LogoSlider.prototype.applyItemSpacing = function (items) {
+    items.forEach(function (item) {
       item.style.flex = "0 0 auto";
-    });
+      item.style.marginRight = this.options.gap + "px";
+    }, this);
   };
 
   LogoSlider.prototype.bindEvents = function () {
@@ -138,7 +144,7 @@
         var clone = item.cloneNode(true);
         clone.setAttribute("data-logo-clone", "true");
         clone.setAttribute("aria-hidden", "true");
-        clone.style.flex = "0 0 auto";
+        this.applyItemSpacing([clone]);
         this.track.appendChild(clone);
         this.clones.push(clone);
       }, this);

@@ -125,6 +125,8 @@ Controls the gap between logo items in pixels.
 
 Default: `40`
 
+The plugin applies this as inline `margin-right` on each original and cloned logo item. This is more reliable in Webflow than relying only on flex `gap`.
+
 `data-logo-duplicate="true"`  
 Controls whether the plugin clones items for seamless looping.
 
@@ -228,7 +230,7 @@ How duplication works:
 }
 ```
 
-If you set spacing in Webflow, you can omit `data-logo-gap`. If you want the plugin to control spacing, use `data-logo-gap="40"`.
+If you want the plugin to control spacing, use `data-logo-gap="40"`. The plugin applies the gap directly to logo items with inline `margin-right`, including cloned items.
 
 ## 10. Initialization
 
