@@ -116,14 +116,14 @@ Pauses the animation on hover and focus.
 
 Default: `true`
 
-`data-logo-gap="40"`  
+`data-logo-gap="100"`  
 Controls the gap between logo items in pixels.
 
 ```html
 <div data-logo-slider data-logo-gap="56"></div>
 ```
 
-Default: `40`
+Default: `100`
 
 The plugin applies this as inline `margin-right` on each original and cloned logo item. This is more reliable in Webflow than relying only on flex `gap`.
 
@@ -188,7 +188,7 @@ How duplication works:
 ## 8. Example HTML
 
 ```html
-<div class="client-logo-slider" data-logo-slider data-logo-speed="1" data-logo-direction="left" data-logo-pause-hover="true" data-logo-gap="40">
+<div class="client-logo-slider" data-logo-slider data-logo-speed="1" data-logo-direction="left" data-logo-pause-hover="true" data-logo-gap="100">
   <div class="logo-track" data-logo-track>
     <div class="company-logo" data-logo-item>
       <img src="logo-1.svg" alt="Company 1">
@@ -230,7 +230,7 @@ How duplication works:
 }
 ```
 
-If you want the plugin to control spacing, use `data-logo-gap="40"`. The plugin applies the gap directly to logo items with inline `margin-right`, including cloned items.
+If you want the plugin to control spacing, use `data-logo-gap="100"`. The plugin applies the gap directly to logo items with inline `margin-right`, including cloned items.
 
 ## 10. Initialization
 

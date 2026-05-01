@@ -15,7 +15,7 @@
     speed: 1,
     direction: "left",
     pauseHover: true,
-    gap: 40,
+    gap: 100,
     duplicate: true
   };
 
