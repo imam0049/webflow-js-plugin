@@ -107,7 +107,7 @@ Changes the secondary state class added to triggers and panels.
 Default: `is-active`
 
 `data-tab-manage-panels="true"`  
-Controls whether the plugin sets panel `display`, `opacity`, `visibility`, and `pointer-events`.
+Controls whether the plugin sets panel `display` and `pointer-events`.
 
 Default: `true`
 
@@ -203,10 +203,6 @@ Design should stay in Webflow. Minimal behavior-friendly CSS:
   cursor: pointer;
 }
 
-[data-tab-panel] {
-  transition: opacity 200ms ease, visibility 200ms ease;
-}
-
 [data-tab-panel][aria-hidden="true"] {
   display: none;
   pointer-events: none;
@@ -269,8 +265,6 @@ If `data-tab-manage-panels="true"`, the plugin also sets:
 
 - `display: flex` on the active panel
 - `display: none` on inactive panels
-- `opacity`
-- `visibility`
 - `pointer-events`
 
 If your GSAP timeline manages those properties, use:
@@ -294,7 +288,7 @@ Panel animation conflicts with GSAP:
 
 - Set `data-tab-manage-panels="false"`.
 - Let GSAP animate panels based on `.active` or `.is-active`.
-- Avoid two scripts controlling the same `display`, `opacity`, or `visibility` properties.
+- Avoid two scripts controlling the same `display` property.
 
 Click jumps to top:
 

@@ -198,9 +198,7 @@
 
       if (this.options.managePanels) {
         panel.style.display = isActive ? "flex" : "none";
-        panel.style.visibility = isActive ? "inherit" : "hidden";
         panel.style.pointerEvents = isActive ? "auto" : "none";
-        panel.style.opacity = isActive ? "1" : "0";
       }
     }, this);
   };
