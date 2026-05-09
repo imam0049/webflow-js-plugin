@@ -161,7 +161,11 @@ Each generated indicator receives:
 
 - `class="indicator-item"`
 - `data-milestone-indicator="0"`, `1`, `2`, and so on
+- `role="button"`
+- `tabindex="0"`
 - `aria-label="Go to milestone 1"`, `2`, `3`, and so on
+
+Indicators are generated as `div` elements, not `button` elements, so your existing Webflow `.indicator-item` sizing is preserved.
 
 The active indicator receives:
 

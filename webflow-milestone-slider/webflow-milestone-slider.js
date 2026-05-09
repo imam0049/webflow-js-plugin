@@ -95,10 +95,11 @@
     fragment = document.createDocumentFragment();
 
     this.items.forEach(function (_, index) {
-      var indicator = document.createElement("button");
-      indicator.type = "button";
+      var indicator = document.createElement("div");
       indicator.className = "indicator-item";
       indicator.setAttribute("data-milestone-indicator", String(index));
+      indicator.setAttribute("role", "button");
+      indicator.setAttribute("tabindex", "0");
       indicator.setAttribute("aria-label", "Go to milestone " + (index + 1));
       fragment.appendChild(indicator);
     });
@@ -139,6 +140,14 @@
   };
 
   MilestoneSlider.prototype.onKeyDown = function (event) {
+    var indicator = event.target.closest(SELECTORS.indicator);
+
+    if (indicator && this.root.contains(indicator) && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      this.goTo(toNumber(indicator.getAttribute("data-milestone-indicator"), 0), true);
+      return;
+    }
+
     if (event.key === "ArrowLeft") {
       event.preventDefault();
       this.prev();
