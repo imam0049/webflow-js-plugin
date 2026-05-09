@@ -15,6 +15,8 @@ Key features:
 - Previous and next controls
 - Generated line indicators
 - Active indicator class support for your existing `indi-active` style
+- Respects fixed and responsive card widths created in Webflow
+- Supports card gaps from Webflow flex/grid styles
 - Keyboard navigation with left and right arrows
 - Touch/swipe support
 - Responsive behavior
@@ -111,6 +113,13 @@ Enables or disables looping.
 `data-milestone-duration="500"`  
 Sets slide transition duration in milliseconds.
 
+Card width and gap:
+
+- Card width should be designed in Webflow on `.abt-milestone-card`.
+- Gap should be designed in Webflow on `.abt-milestone-crads`.
+- The plugin measures real card positions, so fixed widths, responsive widths, and CSS gaps are respected automatically.
+- The plugin does not set card width or card gap.
+
 ## 5. Class Naming Guide
 
 The JavaScript targets only data attributes. Your Webflow classes stay as styling hooks.
@@ -189,9 +198,19 @@ The active indicator receives:
 </div>
 ```
 
-## 9. Minimal CSS
+## 9. Webflow Styling Requirements
 
-The plugin applies the core inline styles needed for horizontal movement. Recommended CSS:
+This plugin is JavaScript-only for behavior. The Webflow developer should handle the design in Webflow classes.
+
+Required layout rules to create in Webflow:
+
+- `.abt-milestone-grid` should hide horizontal overflow.
+- `.abt-milestone-crads` should be a horizontal flex row with no wrapping.
+- `.abt-milestone-crads` should define the card gap.
+- `.abt-milestone-card` should have a fixed or responsive width.
+- `.abt-milestone-card` should not be forced to `100%` unless that is the intended design.
+
+Example CSS for the Webflow developer:
 
 ```css
 .abt-milestone-grid {
@@ -201,11 +220,12 @@ The plugin applies the core inline styles needed for horizontal movement. Recomm
 .abt-milestone-crads {
   display: flex;
   flex-wrap: nowrap;
+  gap: 24px;
 }
 
 .abt-milestone-card {
-  flex: 0 0 100%;
-  max-width: 100%;
+  flex: 0 0 auto;
+  width: 420px;
 }
 
 .indicator-item {
@@ -251,9 +271,9 @@ All queries are scoped inside each `[data-milestone-slider]`, so instances do no
 
 ## 12. Responsive Behavior
 
-The slider uses percentage-based `translateX()` movement, so it responds to the current width of the slider wrapper. On resize, the plugin reapplies the current transform.
+The slider measures each card's real offset and moves with pixel-based `translateX()` values. This means the slider respects the current Webflow layout, including fixed card widths, responsive card widths, and gaps.
 
-Use Webflow breakpoints for the internal card layout, image sizing, typography, and spacing.
+Use Webflow breakpoints for card width, gap, internal card layout, image sizing, typography, and spacing. On resize, the plugin remeasures the card positions and reapplies the current transform.
 
 ## 13. GSAP Compatibility Notes
 
@@ -273,6 +293,8 @@ Slider not moving:
 - Confirm the wrapper has `data-milestone-slider`.
 - Confirm the track has `data-milestone-track`.
 - Confirm each card has `data-milestone-item`.
+- Confirm `.abt-milestone-card` has a fixed or responsive width in Webflow.
+- Confirm `.abt-milestone-crads` is a horizontal no-wrap layout in Webflow.
 - Confirm the track is not being transformed by GSAP or Webflow Interactions.
 
 Indicators not showing:
@@ -289,7 +311,7 @@ Prev/next not working:
 ## 15. Performance Notes
 
 - Uses `transform: translateX()` for smooth movement.
-- Does not read layout every frame.
+- Measures card positions on init and resize, not every frame.
 - Uses event delegation for controls and indicators.
 - Does not require jQuery or build tools.
 - Keeps each slider instance independent.

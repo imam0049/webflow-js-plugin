@@ -53,6 +53,8 @@
     this.indicators = [];
     this.options = getOptions(root);
     this.currentIndex = 0;
+    this.offsets = [];
+    this.maxOffset = 0;
     this.pointerStartX = 0;
     this.pointerDeltaX = 0;
     this.isDragging = false;
@@ -74,21 +76,14 @@
     this.setupLayout();
     this.createIndicators();
     this.bindEvents();
+    this.refresh();
     this.goTo(Math.min(this.options.start, this.items.length - 1), false);
   };
 
   MilestoneSlider.prototype.setupLayout = function () {
-    this.root.style.overflow = this.root.style.overflow || "hidden";
-    this.track.style.display = "flex";
-    this.track.style.flexWrap = "nowrap";
     this.track.style.willChange = "transform";
     this.track.style.transition = "transform " + this.options.duration + "ms ease";
     this.track.style.touchAction = "pan-y";
-
-    this.items.forEach(function (item) {
-      item.style.flex = "0 0 100%";
-      item.style.maxWidth = "100%";
-    });
   };
 
   MilestoneSlider.prototype.createIndicators = function () {
@@ -185,7 +180,19 @@
   };
 
   MilestoneSlider.prototype.onResize = function () {
+    this.refresh();
     this.update();
+  };
+
+  MilestoneSlider.prototype.refresh = function () {
+    var viewportWidth = this.root.getBoundingClientRect().width;
+    var trackWidth = this.track.scrollWidth;
+    var firstLeft = this.items[0] ? this.items[0].offsetLeft : 0;
+
+    this.maxOffset = Math.max(0, trackWidth - viewportWidth);
+    this.offsets = this.items.map(function (item) {
+      return Math.min(Math.max(0, item.offsetLeft - firstLeft), this.maxOffset);
+    }, this);
   };
 
   MilestoneSlider.prototype.prev = function () {
@@ -212,9 +219,9 @@
   };
 
   MilestoneSlider.prototype.update = function () {
-    var offset = this.currentIndex * -100;
+    var offset = this.offsets[this.currentIndex] || 0;
 
-    this.track.style.transform = "translateX(" + offset + "%)";
+    this.track.style.transform = "translateX(" + (offset * -1) + "px)";
 
     this.items.forEach(function (item, index) {
       item.classList.toggle("is-active", index === this.currentIndex);
